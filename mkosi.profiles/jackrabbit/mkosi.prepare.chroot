@@ -4,39 +4,8 @@ set -xeuo pipefail
 
 mkdir -p "${SRCDIR}/cache"
 
-if [ ! -e "${SRCDIR}/cache/oras" ] ; then
-	ORAS_VERSION="$("${SRCDIR}/ghcurl" https://api.github.com/repos/oras-project/oras/releases/latest | jq -rc .tag_name)"
-	ORAS_TAR_URL="$("${SRCDIR}/ghcurl" https://api.github.com/repos/oras-project/oras/releases/latest | jq -rc --arg tag_name "${ORAS_VERSION#v}" --arg arch "$(arch | sed "s/aarch/arm/;s/x86_/amd/")" '.assets[] | select(.name=="oras_" + $tag_name + "_linux_" + $arch + ".tar.gz") | .browser_download_url')"
-	ORAS_SUM_URL="$("${SRCDIR}/ghcurl" https://api.github.com/repos/oras-project/oras/releases/latest | jq -rc --arg tag_name "${ORAS_VERSION#v}" '.assets[] | select(.name=="oras_" + $tag_name + "_checksums.txt") | .browser_download_url')"
-
-	"${SRCDIR}/ghcurl" "${ORAS_TAR_URL}" -Lo "${SRCDIR}/cache/oras_${ORAS_VERSION#v}_linux_$(arch | sed "s/aarch/arm/;s/x86_/amd/").tar.gz"
-	"${SRCDIR}/ghcurl" "${ORAS_SUM_URL}" -Lo "${SRCDIR}/cache/oras.sums"
-
-	pushd "${SRCDIR}/cache"
-		sha256sum -c "oras.sums" --ignore-missing --strict
-		rm "oras.sums"
-		mv oras* "oras.tar.gz"
-	popd
-
-	tar -xvzf "${SRCDIR}/cache/oras.tar.gz" -C "${SRCDIR}/cache" --owner=0 --group=0 --no-same-owner --no-same-permissions oras
-	rm "${SRCDIR}/cache/oras.tar.gz"
-fi
-
-if [ ! -e "${SRCDIR}/cache/cosign" ] ; then
-	COSIGN_BIN_URL="$("${SRCDIR}/ghcurl" https://api.github.com/repos/sigstore/cosign/releases/latest | jq -rc --arg arch "$(arch | sed "s/aarch/arm/;s/x86_/amd/")" '.assets[] | select(.name=="cosign-linux-" + $arch) | .browser_download_url')"
-	COSIGN_SUM_URL="$("${SRCDIR}/ghcurl" https://api.github.com/repos/sigstore/cosign/releases/latest | jq -rc '.assets[] | select(.name=="cosign_checksums.txt") | .browser_download_url')"
-
-	"${SRCDIR}/ghcurl" "${COSIGN_BIN_URL}" -Lo "${SRCDIR}/cache/cosign-linux-$(arch | sed "s/aarch/arm/;s/x86_/amd/")"
-	"${SRCDIR}/ghcurl" "${COSIGN_SUM_URL}" -Lo "${SRCDIR}/cache/cosign.sums"
-
-	pushd "${SRCDIR}/cache"
-		sha256sum -c "cosign.sums" --ignore-missing --strict
-		rm "cosign.sums"
-		mv cosign* "cosign"
-	popd
-
-	chmod +x "${SRCDIR}/cache/cosign"
-fi
+"${SRCDIR}/build-scripts/ensure-oras"
+"${SRCDIR}/build-scripts/ensure-cosign"
 
 if [ ! -e "${SRCDIR}/cache/linux-ogc" ] ; then
 	# Currently there isn't known good method of verifying OGC kernel OCI image other than this command

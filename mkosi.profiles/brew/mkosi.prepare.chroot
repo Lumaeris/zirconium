@@ -4,41 +4,11 @@ set -xeuo pipefail
 
 mkdir -p "${SRCDIR}/cache"
 
-if [ ! -e "${SRCDIR}/cache/crane" ] ; then
-	CRANE_TAR_URL="$("${SRCDIR}/ghcurl" https://api.github.com/repos/google/go-containerregistry/releases/latest | jq -rc --arg arch "$(arch | sed "s/aarch/arm/")" '.assets[] | select(.name=="go-containerregistry_Linux_" + $arch + ".tar.gz") | .browser_download_url')"
-	CRANE_SUM_URL="$("${SRCDIR}/ghcurl" https://api.github.com/repos/google/go-containerregistry/releases/latest | jq -rc '.assets[] | select(.name=="checksums.txt") | .browser_download_url')"
-
-	"${SRCDIR}/ghcurl" "${CRANE_TAR_URL}" -Lo "${SRCDIR}/cache/go-containerregistry_Linux_$(arch | sed "s/aarch/arm/").tar.gz"
-	"${SRCDIR}/ghcurl" "${CRANE_SUM_URL}" -Lo "${SRCDIR}/cache/crane.sums"
-
-	pushd "${SRCDIR}/cache"
-		sha256sum -c "crane.sums" --ignore-missing --strict
-		rm "crane.sums"
-		mv go-containerregistry* "crane.tar.gz"
-	popd
-	
-	tar -xvzf "${SRCDIR}/cache/crane.tar.gz" -C "${SRCDIR}/cache" --owner=0 --group=0 --no-same-owner --no-same-permissions crane
-	rm "${SRCDIR}/cache/crane.tar.gz"
-fi
-
-if [ ! -e "${SRCDIR}/cache/cosign" ] ; then
-	COSIGN_BIN_URL="$("${SRCDIR}/ghcurl" https://api.github.com/repos/sigstore/cosign/releases/latest | jq -rc --arg arch "$(arch | sed "s/aarch/arm/;s/x86_/amd/")" '.assets[] | select(.name=="cosign-linux-" + $arch) | .browser_download_url')"
-	COSIGN_SUM_URL="$("${SRCDIR}/ghcurl" https://api.github.com/repos/sigstore/cosign/releases/latest | jq -rc '.assets[] | select(.name=="cosign_checksums.txt") | .browser_download_url')"
-
-	"${SRCDIR}/ghcurl" "${COSIGN_BIN_URL}" -Lo "${SRCDIR}/cache/cosign-linux-$(arch | sed "s/aarch/arm/;s/x86_/amd/")"
-	"${SRCDIR}/ghcurl" "${COSIGN_SUM_URL}" -Lo "${SRCDIR}/cache/cosign.sums"
-
-	pushd "${SRCDIR}/cache"
-		sha256sum -c "cosign.sums" --ignore-missing --strict
-		rm "cosign.sums"
-		mv cosign* "cosign"
-	popd
-
-	chmod +x "${SRCDIR}/cache/cosign"
-fi
+"${SRCDIR}/build-scripts/ensure-crane"
+"${SRCDIR}/build-scripts/ensure-cosign"
 
 if [ ! -e "${SRCDIR}/cache/ublue-brew" ] ; then
-	"${SRCDIR}/ghcurl" "https://github.com/ublue-os/brew/raw/refs/heads/main/cosign.pub" -Lo "${SRCDIR}/cache/ublue-brew.pub"
+	"${SRCDIR}/build-scripts/ghcurl" "https://github.com/ublue-os/brew/raw/refs/heads/main/cosign.pub" -Lo "${SRCDIR}/cache/ublue-brew.pub"
 	echo "af78ecfda6eb21c35195af3739341715e9cfc3f2f5911dd9c10b0670547bf6e8  ${SRCDIR}/cache/ublue-brew.pub" | sha256sum -c -
 	"${SRCDIR}/cache/cosign" verify --key "${SRCDIR}/cache/ublue-brew.pub" "ghcr.io/ublue-os/brew:latest" | jq
 	rm "${SRCDIR}/cache/ublue-brew.pub"
